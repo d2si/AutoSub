@@ -9,8 +9,8 @@ resource "aws_iam_role" "iam_role_transcoder" {
 
 assume_role_policy  = <<EOF
 {
-    "Version": "2017-10-31",
-    "Statetement": [
+    "Version": "2012-10-17",
+    "Statement": [
     {
         "Action": "sts:AssumeRole",
         "Principal": {
@@ -29,7 +29,7 @@ resource "aws_iam_role_policy" "iam_policy_transcoder" {
 
 policy  = <<EOF
 {
-    "Version": "2017-10-31",
+    "Version": "2012-10-17",
     "Statement": [
     {
         "Action": [
@@ -49,7 +49,7 @@ resource "aws_iam_role" "iam_role_lambda_speech" {
 
 assume_role_policy  = <<EOF
 {
-    "Version": "2017-10-30",
+    "Version": "2012-10-17",
     "Statement": [
     {
         "Action": "sts:AssumeRole",
@@ -69,7 +69,7 @@ resource "aws_iam_role_policy" "iam_policy_lambda_speech" {
 
 policy  = <<EOF
 {
-    "Version": "2017-10-31",
+    "Version": "2012-10-17",
     "Statement": [
     {
         "Action": [
@@ -88,11 +88,11 @@ EOF
 # AWS S3 BUCKET CREATION
 #
 resource "aws_s3_bucket" "main" {
-    bucket = "autosub-s3-bucket"
+    bucket = "autosub"
     acl    = "private"
 
     tags {
-        Name        = "autosub-s3-bucket"
+        Name        = "autosub"
         Environment = "Dev"
     }
 }
@@ -103,23 +103,52 @@ resource "aws_sns_topic" "input_notification" {
 
 policy = <<POLICY
 {
-    "Version": "2017-10-31",
+    "Version": "2012-10-17",
     "Statement": [
     {
         "Effect": "Allow",
         "Principal": {
-            "AWS": "003460636880"
+            "AWS": "*"
         },
         "Action": "SNS:Publish",
-        "Resource": "arn:aws:sns:*:003460636880:s3-event-notification-topic",
+        "Resource": "arn:aws:sns:*:*:s3-event-notification-topic",
         "Condition":{
             "ArnLike": {
                 "aws:SourceArn":"${aws_s3_bucket.main.arn}"
             }
+        }
     }
+
     ]
 }
 POLICY
+}
+
+resource "aws_s3_bucket_notification" "bucket_notification" {
+  bucket = "${aws_s3_bucket.main.id}"
+
+  lambda_function {
+    lambda_function_arn = "${aws_lambda_function.lambda.arn}"
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "Input/"
+  }
+}
+
+#
+# AWS CREATE INPUT & OUTPUT FOLDERS
+#
+resource "aws_s3_bucket_object" "input_folder" {
+    bucket = "${aws_s3_bucket.main.id}"
+    acl    = "private"
+    key    = "Input/"
+    source = "/dev/null"
+}
+
+resource "aws_s3_bucket_object" "output_folder" {
+    bucket = "${aws_s3_bucket.main.id}"
+    acl    = "private"
+    key    = "Output/"
+    source = "/dev/null"
 }
 
 #
@@ -134,16 +163,20 @@ resource "aws_elastictranscoder_pipeline" "transcoder_pipeline" {
         bucket          = "${aws_s3_bucket.main.bucket}"
         storage_class   = "Standard"
     }
+
+    thumbnail_config {
+        bucket          = "${aws_s3_bucket.main.bucket}"
+        storage_class   = "Standard"
+    }
 }
 
 resource "aws_elastictranscoder_preset" "transcoder_preset" {
-    container   = "mp4"
+    container   = "flac"
     description = "autosub_preset"
     name        = "autosub_preset"
 
     audio = {
         audio_packing_mode = "SingleTrack"
-        bit_rate           = 96
         channels           = 2
         codec              = "flac"
         sample_rate        = 44100
@@ -162,15 +195,15 @@ resource "aws_elastictranscoder_preset" "transcoder_preset" {
 # GCP STORAGE BUCKET CREATION
 #
 // Configure the Google Cloud provider
-provider "google" {
-    #credentials = "${file("account.json")}"
-    project     = "autosub-project"
-    region      = "EU"
-}
-
-resource "google_storage_bucket" "main" {
-    name        = "autosub-gcp-bucket"
-    location    = "EU"
-}
+#provider "google" {
+#    #credentials = "${file("account.json")}"
+#    project     = "autosub-project"
+#    region      = "EU"
+#}
+#
+#resource "google_storage_bucket" "main" {
+#    name        = "autosub-gcp-bucket"
+#    location    = "EU"
+#}
 
 
