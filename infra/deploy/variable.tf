@@ -1,3 +1,4 @@
 variable "aws_extractor" {
-  type = "string"
+  type    = "string"
+  default = "audio-extractor"
 }
