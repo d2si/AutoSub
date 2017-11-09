@@ -1,31 +1,64 @@
 # Lambda
-data "archive_file" "archive" {
+data "archive_file" "audio_extractor" {
   type        = "zip"
   source_dir  = "${path.module}/../../code/AudioExtractor/"
-  output_path = "${path.module}/../../build/build-${var.aws_extractor}.zip"
+  output_path = "${path.module}/../../build/${var.audio_extractor_name}.zip"
 }
 
 resource "aws_lambda_function" "audio_extractor" {
-  filename      = "${data.archive_file.archive.output_path}"
-  function_name = "${var.aws_extractor}"
+  filename      = "${data.archive_file.audio_extractor.output_path}"
+  function_name = "${var.audio_extractor_name}"
   role          = "${aws_iam_role.lambda_extractor.arn}"
   handler       = "entrypoint.lambda_handler"
   runtime       = "python3.6"
   timeout       = "120"
-  source_code_hash = "${base64sha256(file(data.archive_file.archive.output_path))}"
+  source_code_hash = "${base64sha256(file(data.archive_file.audio_extractor.output_path))}"
 
   environment {
     variables {
+      "S3_BUCKET_NAME"         = "${aws_s3_bucket.main.bucket}"
       "TRANSCODER_PIPELINE_ID" = "${aws_elastictranscoder_pipeline.main.id}"
       "TRANSCODER_PRESET_ID"   = "${aws_elastictranscoder_preset.main.id}"
     }
   }
 }
 
-resource "aws_lambda_permission" "bucket_access" {
-  statement_id  = "${terraform.workspace}-AllowExecutionFromS3Bucket"
+resource "aws_lambda_permission" "audio_extractor" {
+  statement_id  = "${terraform.workspace}-speech_extractor"
   action        = "lambda:InvokeFunction"
   function_name = "${aws_lambda_function.audio_extractor.arn}"
+  principal     = "s3.amazonaws.com"
+  source_arn    = "${aws_s3_bucket.main.arn}"
+}
+
+data "archive_file" "speech_extractor" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../code/SpeechExtractor/"
+  output_path = "${path.module}/../../build/${var.speech_extractor_name}.zip"
+}
+
+resource "aws_lambda_function" "speech_extractor" {
+  filename      = "${data.archive_file.speech_extractor.output_path}"
+  function_name = "${var.speech_extractor_name}"
+  role          = "${aws_iam_role.lambda_extractor.arn}"
+  handler       = "entrypoint.lambda_handler"
+  runtime       = "python3.6"
+  timeout       = "120"
+  source_code_hash = "${base64sha256(file(data.archive_file.speech_extractor.output_path))}"
+
+  environment {
+    variables {
+      "S3_BUCKET_NAME" = "${aws_s3_bucket.main.bucket}"
+      "CS_BUCKET_NAME" = "${google_storage_bucket.main.name}"
+      "PROJECT_ID"     = "${var.gcloud_project_id}"
+    }
+  }
+}
+
+resource "aws_lambda_permission" "speech_extractor" {
+  statement_id  = "${terraform.workspace}-speech_extractor"
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.speech_extractor.arn}"
   principal     = "s3.amazonaws.com"
   source_arn    = "${aws_s3_bucket.main.arn}"
 }
@@ -41,10 +74,6 @@ resource "aws_s3_bucket" "main" {
   }
 }
 
-resource "aws_sns_topic" "input_notification" {
-  name = "${terraform.workspace}-autosub"
-}
-
 resource "aws_s3_bucket_notification" "bucket_notification" {
   bucket = "${aws_s3_bucket.main.id}"
 
@@ -53,6 +82,16 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
     events              = ["s3:ObjectCreated:*"]
     filter_prefix       = "Input/"
   }
+
+  lambda_function {
+    lambda_function_arn = "${aws_lambda_function.speech_extractor.arn}"
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "Output/"
+  }
+}
+
+resource "aws_sns_topic" "input_notification" {
+  name = "${terraform.workspace}-autosub"
 }
 
 # ElasticTranscoder
@@ -120,7 +159,8 @@ resource "aws_iam_role_policy" "lambda_extractor" {
     {
         "Sid":"S3",
         "Action": [
-            "s3:GetObject"
+            "s3:GetObject",
+            "s3:DeleteObject"
         ],
         "Effect": "Allow",
         "Resource": "arn:aws:s3:::${aws_s3_bucket.main.bucket}/*"
