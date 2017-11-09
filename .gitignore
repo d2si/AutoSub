@@ -3,3 +3,4 @@ vendor/
 build/
 *.tfstate*
 .terraform
+lib/
