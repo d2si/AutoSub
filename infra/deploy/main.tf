@@ -6,12 +6,12 @@ data "archive_file" "audio_extractor" {
 }
 
 resource "aws_lambda_function" "audio_extractor" {
-  filename      = "${data.archive_file.audio_extractor.output_path}"
-  function_name = "${var.audio_extractor_name}"
-  role          = "${aws_iam_role.lambda_extractor.arn}"
-  handler       = "entrypoint.lambda_handler"
-  runtime       = "python3.6"
-  timeout       = "120"
+  filename         = "${data.archive_file.audio_extractor.output_path}"
+  function_name    = "${var.audio_extractor_name}"
+  role             = "${aws_iam_role.lambda_extractor.arn}"
+  handler          = "entrypoint.lambda_handler"
+  runtime          = "python3.6"
+  timeout          = "120"
   source_code_hash = "${base64sha256(file(data.archive_file.audio_extractor.output_path))}"
 
   environment {
@@ -38,12 +38,12 @@ data "archive_file" "speech_extractor" {
 }
 
 resource "aws_lambda_function" "speech_extractor" {
-  filename      = "${data.archive_file.speech_extractor.output_path}"
-  function_name = "${var.speech_extractor_name}"
-  role          = "${aws_iam_role.lambda_extractor.arn}"
-  handler       = "entrypoint.lambda_handler"
-  runtime       = "python3.6"
-  timeout       = "120"
+  filename         = "${data.archive_file.speech_extractor.output_path}"
+  function_name    = "${var.speech_extractor_name}"
+  role             = "${aws_iam_role.lambda_extractor.arn}"
+  handler          = "entrypoint.lambda_handler"
+  runtime          = "python3.6"
+  timeout          = "120"
   source_code_hash = "${base64sha256(file(data.archive_file.speech_extractor.output_path))}"
 
   environment {

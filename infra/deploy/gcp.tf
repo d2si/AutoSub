@@ -1,6 +1,6 @@
 resource "google_storage_bucket" "main" {
-    name        = "${terraform.workspace}-autosub"
-    location    = "EU"
+  name     = "${terraform.workspace}-autosub"
+  location = "EU"
 }
 
 resource "google_storage_bucket_acl" "main" {
