@@ -43,7 +43,8 @@ resource "aws_lambda_function" "speech_extractor" {
   role             = "${aws_iam_role.lambda_extractor.arn}"
   handler          = "entrypoint.lambda_handler"
   runtime          = "python3.6"
-  timeout          = "120"
+  timeout          = "300"
+  memory_size      = "512"
   source_code_hash = "${base64sha256(file(data.archive_file.speech_extractor.output_path))}"
 
   environment {
@@ -118,7 +119,7 @@ resource "aws_elastictranscoder_preset" "main" {
 
   audio = {
     audio_packing_mode = "SingleTrack"
-    channels           = 2
+    channels           = 1
     codec              = "flac"
     sample_rate        = 44100
   }
@@ -160,6 +161,7 @@ resource "aws_iam_role_policy" "lambda_extractor" {
         "Sid":"S3",
         "Action": [
             "s3:GetObject",
+            "s3:PutObject",
             "s3:DeleteObject"
         ],
         "Effect": "Allow",
